@@ -1,0 +1,12 @@
+# https://docs.devin.ai/onboard-devin/environment-yaml
+maintenance: |
+  git pull --rebase origin main || true
+knowledge:
+  - name: startup
+    contents: |
+      Before working on bot files, run: git pull --rebase origin main
+      Main EA source is `MY BOT.mq5`. Include headers are `.mqh` files in repo root.
+  - name: compile
+    contents: |
+      If Wine/MetaEditor is installed, compile with:
+      /home/ubuntu/.mt5/drive_c/Program\ Files/MetaTrader\ 5/MetaEditor64.exe /compile:"$(pwd)/MY BOT.mq5"
