@@ -1,0 +1,70 @@
+﻿
+
+C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MY_BOT.mq5 : information: compiling C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MY_BOT.mq5
+C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MY_BOT.mq5 : information: including C:\Program Files\MetaTrader 5\MQL5\Include\Trade\Trade.mqh
+C:\Program Files\MetaTrader 5\MQL5\Include\Trade\Trade.mqh : information: including C:\Program Files\MetaTrader 5\MQL5\Include\Object.mqh
+C:\Program Files\MetaTrader 5\MQL5\Include\Object.mqh : information: including C:\Program Files\MetaTrader 5\MQL5\Include\StdLibErr.mqh
+C:\Program Files\MetaTrader 5\MQL5\Include\Trade\Trade.mqh : information: including C:\Program Files\MetaTrader 5\MQL5\Include\Trade\SymbolInfo.mqh
+C:\Program Files\MetaTrader 5\MQL5\Include\Trade\Trade.mqh : information: including C:\Program Files\MetaTrader 5\MQL5\Include\Trade\OrderInfo.mqh
+C:\Program Files\MetaTrader 5\MQL5\Include\Trade\Trade.mqh : information: including C:\Program Files\MetaTrader 5\MQL5\Include\Trade\HistoryOrderInfo.mqh
+C:\Program Files\MetaTrader 5\MQL5\Include\Trade\Trade.mqh : information: including C:\Program Files\MetaTrader 5\MQL5\Include\Trade\PositionInfo.mqh
+C:\Program Files\MetaTrader 5\MQL5\Include\Trade\Trade.mqh : information: including C:\Program Files\MetaTrader 5\MQL5\Include\Trade\DealInfo.mqh
+C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MY_BOT.mq5 : information: including C:\Program Files\MetaTrader 5\MQL5\Experts\bot\SymbolProfiler.mqh
+C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MY_BOT.mq5 : information: including C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MarketStateManager.mqh
+C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MY_BOT.mq5 : information: including C:\Program Files\MetaTrader 5\MQL5\Experts\bot\IndicatorManager.mqh
+C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MY_BOT.mq5 : information: including C:\Program Files\MetaTrader 5\MQL5\Experts\bot\ZoneManager.mqh
+C:\Program Files\MetaTrader 5\MQL5\Experts\bot\ZoneManager.mqh : information: including C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MarketStructure.mqh
+C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MarketStructure.mqh : information: including C:\Program Files\MetaTrader 5\MQL5\Include\Arrays\ArrayObj.mqh
+C:\Program Files\MetaTrader 5\MQL5\Include\Arrays\ArrayObj.mqh : information: including C:\Program Files\MetaTrader 5\MQL5\Include\Arrays\Array.mqh
+C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MY_BOT.mq5 : information: including C:\Program Files\MetaTrader 5\MQL5\Experts\bot\ZoneScoringEngine.mqh
+C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MY_BOT.mq5 : information: including C:\Program Files\MetaTrader 5\MQL5\Experts\bot\RiskManager.mqh
+C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MY_BOT.mq5 : information: including C:\Program Files\MetaTrader 5\MQL5\Experts\bot\SignalEngine.mqh
+C:\Program Files\MetaTrader 5\MQL5\Experts\bot\SignalEngine.mqh : information: including C:\Program Files\MetaTrader 5\MQL5\Experts\bot\CandlePatterns.mqh
+C:\Program Files\MetaTrader 5\MQL5\Experts\bot\SignalEngine.mqh : information: including C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MarketClassifier.mqh
+C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MY_BOT.mq5 : information: including C:\Program Files\MetaTrader 5\MQL5\Experts\bot\PositionManager.mqh
+C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MY_BOT.mq5 : information: including C:\Program Files\MetaTrader 5\MQL5\Experts\bot\AIScaffold.mqh
+C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MY_BOT.mq5 : information: including C:\Program Files\MetaTrader 5\MQL5\Experts\bot\TradeExecutor.mqh
+C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MY_BOT.mq5 : information: including C:\Program Files\MetaTrader 5\MQL5\Experts\bot\NewsFilter.mqh
+C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MY_BOT.mq5 : information: including C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MaintenanceFilter.mqh
+C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MY_BOT.mq5 : information: including C:\Program Files\MetaTrader 5\MQL5\Experts\bot\AIMemory.mqh
+C:\Program Files\MetaTrader 5\MQL5\Experts\bot\MY_BOT.mq5 : information: including C:\Program Files\MetaTrader 5\MQL5\Experts\bot\ConfidenceTracker.mqh
+C:\Program Files\MetaTrader 5\MQL5\Include\Trade\PositionInfo.mqh(184,29) : warning 89: 'POSITION_COMMISSION' is deprecated
+C:\Program Files\MetaTrader 5\MQL5\Include\Trade\Trade.mqh(166,23) : warning 89: 'MQL5_OPTIMIZATION' is deprecated, use 'MQL_OPTIMIZATION' instead
+C:\Program Files\MetaTrader 5\MQL5\Include\Trade\Trade.mqh(168,23) : warning 89: 'MQL5_TESTING' is deprecated, use 'MQL_TESTER' instead
+C:\Program Files\MetaTrader 5\MQL5\Include\Trade\Trade.mqh(1234,41) : warning 89: 'ACCOUNT_FREEMARGIN' is deprecated, use 'ACCOUNT_MARGIN_FREE' instead
+ : information: generating code
+ : information: generating code 3%
+ : information: generating code 6%
+ : information: generating code 9%
+ : information: generating code 12%
+ : information: generating code 15%
+ : information: generating code 18%
+ : information: generating code 21%
+ : information: generating code 24%
+ : information: generating code 27%
+ : information: generating code 30%
+ : information: generating code 33%
+ : information: generating code 36%
+ : information: generating code 39%
+ : information: generating code 42%
+ : information: generating code 45%
+ : information: generating code 48%
+ : information: generating code 51%
+ : information: generating code 54%
+ : information: generating code 57%
+ : information: generating code 60%
+ : information: generating code 63%
+ : information: generating code 66%
+ : information: generating code 69%
+ : information: generating code 72%
+ : information: generating code 75%
+ : information: generating code 78%
+ : information: generating code 81%
+ : information: generating code 84%
+ : information: generating code 87%
+ : information: generating code 90%
+ : information: generating code 93%
+ : information: generating code 95%
+ : information: generating code 100%
+ : information: code generated
+Result: 0 errors, 4 warnings, 10651 ms elapsed, cpu='X64 Regular'

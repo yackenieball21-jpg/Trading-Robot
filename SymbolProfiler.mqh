@@ -970,15 +970,6 @@ bool LoadSymbolProfile(SymbolProfile &prof)
 }
 
 //+------------------------------------------------------------------+
-//| Convenience: is current spread tradeable?                        |
-//+------------------------------------------------------------------+
-bool IsSpreadAcceptable(const SymbolProfile &prof)
-{
-   if(prof.spreadCalibrated <= 0) return true;
-   return (prof.spreadCalibrated <= prof.effectiveSpreadCapPoints);
-}
-
-//+------------------------------------------------------------------+
 //| Convenience: is this a high-liquidity window?                    |
 //+------------------------------------------------------------------+
 bool IsHighLiquiditySession(const SymbolProfile &prof)

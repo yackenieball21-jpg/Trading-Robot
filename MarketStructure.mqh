@@ -1,4 +1,4 @@
-﻿//+------------------------------------------------------------------+
+//+------------------------------------------------------------------+
 //|                                              MarketStructure.mqh |
 //|  Market Structure Detection: Swings, Channels, Trend/Range      |
 //|  Core: In trends, use diagonal channel S/R + flipped major      |
@@ -281,13 +281,10 @@ MarketStructureState g_structure;
 //| Function declarations                                              |
 //+------------------------------------------------------------------+
 void DetectSwingPoints(const IndicatorState &ind, double atr);
-void ClassifySwingSequences(void);
 ENUM_STRUCTURE_STATE DetermineStructureState(const IndicatorState &ind, double atr);
 int GetMarketTrend(void);
 
-// D1 Master Trendline helpers
-bool BuildD1MasterTrendline();
-bool ReflectD1TrendlineToLowerTF(ENUM_TIMEFRAMES tf, double &outLineNow, int &outDir);
+// D1 trendline helper (stub - full trendline implementation removed per user request)
 bool IsD1TrendlineBrokenAndRetested(const IndicatorState &ind, double atr);
 bool IsTrendStructureConsolidating(const IndicatorState &ind, double atr);
 
@@ -2230,142 +2227,6 @@ bool IsPriceRetestingDynamicZone(double price, const DynamicZoneBand &zone, doub
    }
    
    return false;
-}
-
-//+------------------------------------------------------------------+
-//| Trend End Detection - Bull Trend                                  |
-//| Returns number of votes (0-4) toward trend ending                 |
-//+------------------------------------------------------------------+
-int CheckBullTrendEndVotes(const IndicatorState &ind, double atr, 
-                           const DynamicZoneBand &zone, int confirmBars, double adxFloor)
-{
-   int votes = 0;
-   
-   // Vote 1: Structure flipped to bearish
-   if(g_structure.state == STRUCTURE_BEAR_TREND || g_structure.state == STRUCTURE_BIAS_BEAR)
-   {
-      votes++;
-      Print("[TREND_END_VOTE] side=BUY vote=1 reason=structure_bearish");
-   }
-   
-   // Vote 2: Directional channel invalid or bear channel took over
-   if(!g_structure.channel.directionalValid || 
-      (g_structure.channel.directionalValid && g_structure.channel.direction == -1))
-   {
-      votes++;
-      Print("[TREND_END_VOTE] side=BUY vote=2 reason=channel_invalid_or_bear");
-   }
-   
-   // Vote 3: Price broke below dynamic support band for confirmBars consecutive bars
-   // This is tracked externally via barsBreakingZone counter
-   
-   // Vote 4: EMA50 sloping down + price below EMA50 + ADX < floor
-   double ema50 = GetEMA50(ind, 1);
-   double ema50Prev = (ArraySize(ind.ema50) >= 6) ? ind.ema50[5] : ema50;
-   double ema50Slope = ema50 - ema50Prev;
-   double adx = GetADX(ind, 1);
-   double close = ind.closeArr[1];
-   
-   if(ema50Slope < 0 && close < ema50 && adx < adxFloor)
-   {
-      votes++;
-      Print("[TREND_END_VOTE] side=BUY vote=4 reason=ema50_down_price_below_adx_low",
-            " ema50Slope=", DoubleToString(ema50Slope, _Digits),
-            " close=", DoubleToString(close, _Digits),
-            " ema50=", DoubleToString(ema50, _Digits),
-            " adx=", DoubleToString(adx, 1));
-   }
-   
-   return votes;
-}
-
-//+------------------------------------------------------------------+
-//| Trend End Detection - Bear Trend                                  |
-//| Returns number of votes (0-4) toward trend ending                 |
-//+------------------------------------------------------------------+
-int CheckBearTrendEndVotes(const IndicatorState &ind, double atr,
-                           const DynamicZoneBand &zone, int confirmBars, double adxFloor)
-{
-   int votes = 0;
-   
-   // Vote 1: Structure flipped to bullish
-   if(g_structure.state == STRUCTURE_BULL_TREND || g_structure.state == STRUCTURE_BIAS_BULL)
-   {
-      votes++;
-      Print("[TREND_END_VOTE] side=SELL vote=1 reason=structure_bullish");
-   }
-   
-   // Vote 2: Directional channel invalid or bull channel took over
-   if(!g_structure.channel.directionalValid || 
-      (g_structure.channel.directionalValid && g_structure.channel.direction == +1))
-   {
-      votes++;
-      Print("[TREND_END_VOTE] side=SELL vote=2 reason=channel_invalid_or_bull");
-   }
-   
-   // Vote 3: Price broke above dynamic resistance band for confirmBars consecutive bars
-   // This is tracked externally via barsBreakingZone counter
-   
-   // Vote 4: EMA50 sloping up + price above EMA50 + ADX < floor
-   double ema50 = GetEMA50(ind, 1);
-   double ema50Prev = (ArraySize(ind.ema50) >= 6) ? ind.ema50[5] : ema50;
-   double ema50Slope = ema50 - ema50Prev;
-   double adx = GetADX(ind, 1);
-   double close = ind.closeArr[1];
-   
-   if(ema50Slope > 0 && close > ema50 && adx < adxFloor)
-   {
-      votes++;
-      Print("[TREND_END_VOTE] side=SELL vote=4 reason=ema50_up_price_above_adx_low",
-            " ema50Slope=", DoubleToString(ema50Slope, _Digits),
-            " close=", DoubleToString(close, _Digits),
-            " ema50=", DoubleToString(ema50, _Digits),
-            " adx=", DoubleToString(adx, 1));
-   }
-   
-   return votes;
-}
-
-//+------------------------------------------------------------------+
-//| Check if bull trend has ended (>= 2 votes)                        |
-//+------------------------------------------------------------------+
-bool IsBullTrendEnded(const IndicatorState &ind, double atr, 
-                      const DynamicZoneBand &zone, int barsBreakingZone,
-                      int confirmBars, double adxFloor)
-{
-   int votes = CheckBullTrendEndVotes(ind, atr, zone, confirmBars, adxFloor);
-   
-   // Add vote 3 if price broke below zone for confirmBars
-   if(barsBreakingZone >= confirmBars)
-   {
-      votes++;
-      Print("[TREND_END_VOTE] side=BUY vote=3 reason=broke_below_zone bars=", barsBreakingZone);
-   }
-   
-   bool ended = (votes >= 2);
-   Print("[TREND_END_CHECK] side=BUY votes=", votes, " ended=", ended);
-   return ended;
-}
-
-//+------------------------------------------------------------------+
-//| Check if bear trend has ended (>= 2 votes)                        |
-//+------------------------------------------------------------------+
-bool IsBearTrendEnded(const IndicatorState &ind, double atr,
-                      const DynamicZoneBand &zone, int barsBreakingZone,
-                      int confirmBars, double adxFloor)
-{
-   int votes = CheckBearTrendEndVotes(ind, atr, zone, confirmBars, adxFloor);
-   
-   // Add vote 3 if price broke above zone for confirmBars
-   if(barsBreakingZone >= confirmBars)
-   {
-      votes++;
-      Print("[TREND_END_VOTE] side=SELL vote=3 reason=broke_above_zone bars=", barsBreakingZone);
-   }
-   
-   bool ended = (votes >= 2);
-   Print("[TREND_END_CHECK] side=SELL votes=", votes, " ended=", ended);
-   return ended;
 }
 
 //+------------------------------------------------------------------+
@@ -5106,6 +4967,17 @@ void UpdateReversalState(const IndicatorState &ind, double atr, double nearestSu
       g_reversal.bullState = REVERSAL_NONE;
       g_reversal.bearState = REVERSAL_NONE;
    }
+}
+
+//+------------------------------------------------------------------+
+//| D1 trendline broken+retested stub                                |
+//| Full D1 trendline engine was removed per user request.         |
+//| Returns false so trend-zone retirement falls back to the         |
+//| structure-consolidation check in ShouldRetireTrendZone.          |
+//+------------------------------------------------------------------+
+bool IsD1TrendlineBrokenAndRetested(const IndicatorState &ind, double atr)
+{
+   return false;
 }
 
 #endif // MARKET_STRUCTURE_MQH
