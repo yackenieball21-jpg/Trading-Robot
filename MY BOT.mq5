@@ -38,16 +38,16 @@ static const string EA_VERSION = "v10.1";
 //+------------------------------------------------------------------+
 input group "=== Risk Management ==="
 input double EquityPercentForLots      = 1.0;   // (Legacy) Equity % fallback - not primary
-input double RiskPercent               = 1.0;   // Risk per trade (%) — auto-adjusts lots per symbol/spread/digits
+input double RiskPercent               = 0.50;  // Risk per trade (%) — auto-adjusts lots per symbol/spread/digits
 input double RewardRisk                = 2.0;   // Reward:Risk ratio
-input double MaxDailyLossPercent       = 5.0;   // Max daily loss (%)
-input double MaxDrawdownPercent        = 15.0;  // Max account drawdown (%)
-input int    MaxConsecutiveLosses      = 5;     // Max consecutive losses
+input double MaxDailyLossPercent       = 2.0;   // Max daily loss (%)
+input double MaxDrawdownPercent        = 10.0;  // Max account drawdown (%)
+input int    MaxConsecutiveLosses      = 3;     // Max consecutive losses
 input int    MaxBrokerErrors           = 3;     // Max broker errors before lockout
 input int    CooldownBarsAfterLoss     = 1;     // Bars to wait after loss
-input bool   UseMinLotFallback           = true;  // Use volMin when idealLots < volMin (RISK MODE ONLY)
-input double MinLotFallbackMaxRiskMult   = 5.0;   // Max risk multiple allowed for min-lot fallback
-input double MinLotFallbackMaxEquityPct  = 6.0;   // Absolute max % equity allowed when using volMin fallback
+input bool   UseMinLotFallback           = false; // Use volMin when idealLots < volMin (RISK MODE ONLY)
+input double MinLotFallbackMaxRiskMult   = 1.25;  // Max risk multiple allowed for min-lot fallback
+input double MinLotFallbackMaxEquityPct  = 1.50;  // Absolute max % equity allowed when using volMin fallback
 input bool   AllowAggressiveMinLotFallback       = false; // OPTIONAL: Second-stage aggressive fallback (default OFF)
 input double AggressiveMinLotFallbackMaxRiskMult = 12.0;  // Aggressive max risk multiple (only if above enabled)
 input double AggressiveMinLotFallbackMaxEquityPct = 12.0; // Aggressive max equity % (only if above enabled)
@@ -87,8 +87,8 @@ input int    ATRPeriod             = 14;       // ATR period (live)
 input int    ATRReferencePeriod    = 20;       // ATR reference period (original tuning baseline)
 
 input group "=== Position Stacking ==="
-input bool   EnableStacking             = true;    // Allow multiple sweep entries per session
-input bool   OnePositionPerSymbol       = false;   // Only one position per symbol
+input bool   EnableStacking             = false;   // Allow multiple sweep entries per session
+input bool   OnePositionPerSymbol       = true;    // Only one position per symbol
 
 input group "=== Entry Filters ==="
 input int    TrendSlopeLookback    = 5;        // Bars for EMA slope (regime classifier)
@@ -116,7 +116,7 @@ input int    ClassSlopeLookback    = 3;        // Bars for slope comparison
 
 input group "=== Position Management ==="
 // OnePositionPerSymbol moved to Position Stacking group
-input int    MaxOpenPositionsTotal = 4;        // Max total positions (0=unlimited)
+input int    MaxOpenPositionsTotal = 2;        // Max total positions (0=unlimited)
 input bool   AllowHedging          = false;    // Allow opposite-direction positions on same symbol
 input bool   CloseOnOppositeCross  = false;    // DISABLED for live - trend positions managed by ManageStructureTrail only
 input bool   ExitOnCloseBeyondEMA50 = false;   // DISABLED for live - no immediate EMA50 exit
@@ -164,8 +164,8 @@ input group "=== Notifications ==="
 input bool   EnableNotifications   = false;    // Enable push notifications
 
 input group "=== Zone Scoring ==="
-input bool   UseZoneScoring        = true;     // Enable zone-score entry gate
-input int    MinEntryScore         = 5;        // Min score to allow entry (0=disabled)
+input bool   UseZoneScoring        = false;    // Enable zone-score entry gate
+input int    MinEntryScore         = 0;        // Min score to allow entry (0=disabled)
 input double ZoneConfluenceATRMult = 0.5;      // ATR mult for fresh/hist zone confluence
 input int    MaxZoneRetests        = 4;        // Max retests before zone is overtested
 // NOTE: ZoneLifetimeBars moved to "D1 Zone Strength & Lookback" section as InpD1ZoneLifetimeBars
@@ -183,7 +183,7 @@ input double InpPhotoZoneWeakRejectThreshold   = 3.25;
 input int    InpPhotoZoneMinimumChecklistHits  = 3;
 
 // Wick-play entry model
-input bool   InpUseWickPlayEntryOnly           = true;   // true = entries only from wick/sweep/rejection at zones
+input bool   InpUseWickPlayEntryOnly           = false;  // true = entries only from wick/sweep/rejection at zones
 input bool   InpAggressiveZoneEntry            = true;   // Allow entries on any zone touch with basic candle confirmation (less strict)
 input double InpWickPlayMinWickToRange         = 0.20;   // wick must be at least 20% of candle range (relaxed for more entries)
 input double InpWickPlayMinCloseBackZoneATR    = 0.10;   // close must reclaim/reject zone by ATR amount (increased)
@@ -229,7 +229,7 @@ input bool   SweepOneTradePerZone   = true;     // One trade per zone until pric
 
 input group "=== Setup Family Control ==="
 input bool   UseBreakRetestEntry               = true;   // ON - trend continuation family
-input bool   UseReversalDetector               = true;   // ON - reversal detection enabled
+input bool   UseReversalDetector               = false;  // OFF - reversal detection disabled
 input bool   AllowSweepCounterTrend            = false;  // Allow sweep reversals counter-trend
 input double ReversalScoreMin                  = 5.0;    // Min score for sweep reversal entry
 input double BreakRetestScoreMin               = 4.0;    // Min score for break+retest entry
@@ -270,10 +270,10 @@ input bool   InpSDDrawRectangles           = true;     // Draw full rectangles l
 input color  InpSDDemandColor              = C'0,255,0';   // Demand = bright green
 input color  InpSDSupplyColor              = C'255,0,0';   // Supply = bright red
 input ENUM_SD_MARKING_METHOD InpSDMarkingMethod = SD_MARK_METHOD_MOMENTUM; // Primary method: momentum candles
-input bool   InpSDEnableAllMethods         = true;     // Use all 3 S/D methods together (momentum + consolidation + wick)
+input bool   InpSDEnableAllMethods         = false;    // Use all 3 S/D methods together (momentum + consolidation + wick)
 input bool   InpSDUseMomentumMethod        = true;     // Momentum: 3+ strong candles → zone = previous candle high/low
-input bool   InpSDUseConsolidationMethod   = true;     // Consolidation: sideways base → box the entire range
-input bool   InpSDUseWickMethod            = true;     // Default: wick-play S/D method
+input bool   InpSDUseConsolidationMethod   = false;    // Consolidation: sideways base → box the entire range
+input bool   InpSDUseWickMethod            = false;    // Default: wick-play S/D method
 input bool   InpSDUseSingleMomentumCandleMethod = false;  // Extreme impulse method: 1 huge candle marks previous candle high/low as S/D zone
 input int    InpSDMinMomentumCandles       = 3;        // PDF method: at least N momentum candles (min floor = 3)
 input int    InpSDMaxMomentumCandles       = 6;        // Allow stronger 4/5/6 candle runs
@@ -350,7 +350,7 @@ input double InpSDStarSmallBodyPct             = 0.35;   // Middle star candle b
 input double InpSDStarCloseBeyondMidPct        = 0.50;   // Confirmation candle closes beyond 50% of first candle
 
 // STEP 1: Pre-trade confidence and quality gates
-input bool   InpSDUsePreTradeConfidenceGate      = true;
+input bool   InpSDUsePreTradeConfidenceGate      = false;
 input double InpSDMinPreTradeConfidence          = 50.0;
 input bool   InpSDBlockIndecisionEntries         = true;
 input bool   InpSDRequireOppositeZoneOrStrongRR  = true;
@@ -387,17 +387,17 @@ input int InpD1ZoneLifetimeBars        = 260;   // Keep D1 zones alive ~1 year
 input group "=== Trend & Counter-Trend Strategy ==="
 input bool   InpUseHorizontalTrendZones        = true;    // Use horizontal continuation zones in trend
 input bool   InpKeepTrendZonesUntilRetestFail  = true;    // Keep trend zones until trendline break+retest
-input bool   InpUseTrendCampaignAdds           = true;    // Allow add-on trend positions
+input bool   InpUseTrendCampaignAdds           = false;   // Allow add-on trend positions
 input int    InpMaxTrendCampaignPositions      = 4;       // Max trend campaign positions
 input bool   InpCloseTrendOnDoubleTopBottom    = true;    // Close trend on double top/bottom
 input bool   InpCloseTrendOnRepeatedExhaustion = true;    // Close trend on repeated exhaustion rejection
 input int    InpExhaustionRejectCount          = 2;       // Exhaustion rejection count threshold
-input bool   InpEnableCounterTrend             = true;    // Enable counter-trend strategy
-input bool   InpUseCounterTrend                = true;    // Use counter-trend strategy
+input bool   InpEnableCounterTrend             = false;   // Enable counter-trend strategy
+input bool   InpUseCounterTrend                = false;   // Use counter-trend strategy
 input bool   InpCounterTrendNeedsExhaustion    = true;    // Counter-trend requires exhaustion confirmation
 input double InpCounterTrendRR                 = 1.2;     // Counter-trend minimum RR
 input bool   InpCounterTrendTrailingOnly       = true;    // Counter-trend uses trailing stop only
-input bool   InpUseBreakoutRetest              = true;    // Use breakout retest strategy
+input bool   InpUseBreakoutRetest              = false;   // Use breakout retest strategy
 
 input group "=== Range Strategy ==="
 input bool   InpStrictSingleRangePair          = true;    // Strict single support/resistance pair in range
@@ -1625,7 +1625,8 @@ void OnTick()
        (g_breakout.bearBreakouts[0].state == BREAKOUT_BEAR_PULLBACK ||
         g_breakout.bearBreakouts[0].state == BREAKOUT_BEAR_ENTRY));
 
-   if(entryRegime == REGIME_RANGE || entryRegime == REGIME_CONSOLIDATION || entryRegime == REGIME_NONE)
+   if(InpUseBreakoutRetest &&
+      (entryRegime == REGIME_RANGE || entryRegime == REGIME_CONSOLIDATION || entryRegime == REGIME_NONE))
    {
       if(bullBreakoutReady && bearBreakoutReady)
       {

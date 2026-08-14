@@ -4839,7 +4839,7 @@ RangeBoundarySelection SelectStrongestRangeBoundaries(const IndicatorState &ind,
             bool newIsSignificantlyBetter = (out.bestSupply.valid &&
                                              out.bestSupply.score > s_prevResistance.score * 1.15);
             bool newIsMateriallyOuter     = (out.bestSupply.valid &&
-                                             s_prevResistance.mid - s_prevResistance.mid > atr * 0.5);
+                                             out.bestSupply.mid - s_prevResistance.mid > atr * 0.5);
             if(!newIsSignificantlyBetter && !newIsMateriallyOuter && out.bestSupply.valid)
             {
                Print("[RANGE_BOUNDARY_STICKINESS] kept_previous_resistance=", s_prevResistance.zoneIdx,
@@ -5196,23 +5196,34 @@ bool IsHorizontalRangeMapValid(const RangeBoundarySelection &rb)
 {
    if(!rb.valid)
       return false;
-   
-   if(!rb.bestDemand.valid)
+
+   if(!rb.bestDemand.valid ||
+      !rb.bestSupply.valid)
       return false;
-   
-   if(!rb.bestSupply.valid)
+
+   if(rb.bestDemand.mid <= 0.0 ||
+      rb.bestSupply.mid <= 0.0)
       return false;
-   
-   // Both indices must be valid
-   if(rb.bestDemand.zoneIdx < 0)
+
+   if(rb.bestDemand.mid >= rb.bestSupply.mid)
       return false;
-   
-   if(rb.bestSupply.zoneIdx < 0)
+
+   if(rb.totalWidth <= 0.0)
       return false;
-   
-   // Patch 8: Provisional range maps are now allowed for boundary wrapper trading.
-   // They still satisfy the same demand+supply requirements above.
-   
+
+   if(rb.bestDemand.zoneIdx < 0 ||
+      rb.bestSupply.zoneIdx < 0)
+   {
+      if(!rb.provisional)
+         return false;
+
+      Print("[RANGE_MAP_PROVISIONAL_VALID]",
+            " demandMid=",
+            DoubleToString(rb.bestDemand.mid, _Digits),
+            " supplyMid=",
+            DoubleToString(rb.bestSupply.mid, _Digits));
+   }
+
    return true;
 }
 
@@ -5398,22 +5409,21 @@ EntryDecision ShouldOpenBuyRange(const IndicatorState &ind,
             " state=", StructureStateToString(g_structure.state));
    }
 
-   if(regime != REGIME_RANGE)
+   bool rangeContext =
+      (regime == REGIME_RANGE) ||
+      (g_structure.valid &&
+       (g_structure.state == STRUCTURE_RANGE ||
+        g_structure.state == STRUCTURE_CONSOLIDATION) &&
+       g_structure.rangeQuality >= 6.0);
+
+   if(!rangeContext)
    {
       out.reason = "regime is not range";
       return out;
    }
 
-   // EMA GUARD: Block EMA alignment only entries
-   bool emaAligned = HasBullEMAFilter(ind);
-   bool zoneInteraction = false; // Will be set when zone is found
-   
-   if(emaAligned && !zoneInteraction)
-   {
-      out.reason = "EMA alignment only is not a valid trigger";
-      Print("[ENTRY_BLOCKED] reason=ema_only");
-      return out;
-   }
+   if(regime != REGIME_RANGE)
+      Print("[RANGE_SOFT_CONTEXT] side=BUY");
 
    Print("[DYNAMIC_CHANNEL] ignored_for_range=true side=BUY");
 
@@ -6004,22 +6014,21 @@ EntryDecision ShouldOpenSellRange(const IndicatorState &ind,
             " state=", StructureStateToString(g_structure.state));
    }
 
-   if(regime != REGIME_RANGE)
+   bool rangeContext =
+      (regime == REGIME_RANGE) ||
+      (g_structure.valid &&
+       (g_structure.state == STRUCTURE_RANGE ||
+        g_structure.state == STRUCTURE_CONSOLIDATION) &&
+       g_structure.rangeQuality >= 6.0);
+
+   if(!rangeContext)
    {
       out.reason = "regime is not range";
       return out;
    }
 
-   // EMA GUARD: Block EMA alignment only entries
-   bool emaAligned = HasBearEMAFilter(ind);
-   bool zoneInteraction = false; // Will be set when zone is found
-   
-   if(emaAligned && !zoneInteraction)
-   {
-      out.reason = "EMA alignment only is not a valid trigger";
-      Print("[ENTRY_BLOCKED] reason=ema_only");
-      return out;
-   }
+   if(regime != REGIME_RANGE)
+      Print("[RANGE_SOFT_CONTEXT] side=SELL");
 
    // --- GRADED COUNTERTREND BLOCK FOR RANGE SELL (Part 4 patch) ---
    if(BlockCounterTrendTrades)
@@ -6842,29 +6851,42 @@ EntryDecision GenerateTrendContinuationDecision(const IndicatorState &ind,
       return out;
    }
 
-   // Patch 12: D1-aligned structural override — allow continuation when EMA cross lags
-   // but D1 bias and price/structure all agree.
-   if(isBull && !(close1 > ema200 && ema50 >= ema200))
+   bool strictBullEMA = (close1 > ema200 && ema50 >= ema200);
+   bool strictBearEMA = (close1 < ema200 && ema50 <= ema200);
+
+   bool bullStructureOverride =
+      (d1 == D1_BIAS_BULL &&
+       bullStructure &&
+       close1 > ema50 &&
+       g_structure.consecutiveHH >= 1 &&
+       g_structure.consecutiveHL >= 1 &&
+       adxNow >= MathMax(EntryADXMin, 18.0));
+
+   bool bearStructureOverride =
+      (d1 == D1_BIAS_BEAR &&
+       bearStructure &&
+       close1 < ema50 &&
+       g_structure.consecutiveLH >= 1 &&
+       g_structure.consecutiveLL >= 1 &&
+       adxNow >= MathMax(EntryADXMin, 18.0));
+
+   if(isBull && !(strictBullEMA || bullStructureOverride))
    {
-      bool d1Override = (d1 == D1_BIAS_BULL && close1 > ema200 && bullStructure);
-      if(!d1Override)
-      {
-         out.reason = "trend continuation BUY blocked: EMA50/EMA200 filter not bullish | core=" + coreFailReason;
-         return out;
-      }
-      Print("[TREND_CONT_OVERRIDE] BUY: D1 bull + price>EMA200 + bull structure, EMA cross lag ignored");
+      out.reason = "trend continuation BUY blocked: EMA50/EMA200 filter not bullish and no structural override | core=" + coreFailReason;
+      return out;
    }
 
-   if(!isBull && !(close1 < ema200 && ema50 <= ema200))
+   if(!isBull && !(strictBearEMA || bearStructureOverride))
    {
-      bool d1Override = (d1 == D1_BIAS_BEAR && close1 < ema200 && bearStructure);
-      if(!d1Override)
-      {
-         out.reason = "trend continuation SELL blocked: EMA50/EMA200 filter not bearish | core=" + coreFailReason;
-         return out;
-      }
-      Print("[TREND_CONT_OVERRIDE] SELL: D1 bear + price<EMA200 + bear structure, EMA cross lag ignored");
+      out.reason = "trend continuation SELL blocked: EMA50/EMA200 filter not bearish and no structural override | core=" + coreFailReason;
+      return out;
    }
+
+   if(isBull && !strictBullEMA && bullStructureOverride)
+      Print("[TREND_EMA_OVERRIDE] side=BUY");
+
+   if(!isBull && !strictBearEMA && bearStructureOverride)
+      Print("[TREND_EMA_OVERRIDE] side=SELL");
 
    if(adxNow < MathMax(EntryADXMin, 12.0))
    {
