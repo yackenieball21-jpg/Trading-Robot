@@ -94,11 +94,20 @@ void InitRiskState()
 }
 
 //+------------------------------------------------------------------+
+//| Risk state filename (account-wide, not per-symbol)               |
+//+------------------------------------------------------------------+
+string GetRiskStateFilename()
+{
+   long login = AccountInfoInteger(ACCOUNT_LOGIN);
+   return StringFormat("risk_state_account_%I64d.dat", login);
+}
+
+//+------------------------------------------------------------------+
 //| Save risk state to file (survive restarts)                       |
 //+------------------------------------------------------------------+
 void SaveRiskState()
 {
-   string filename = "risk_state_" + _Symbol + ".dat";
+   string filename = GetRiskStateFilename();
    int fh = FileOpen(filename, FILE_WRITE | FILE_ANSI | FILE_COMMON);
    if(fh == INVALID_HANDLE) return;
 
@@ -122,7 +131,7 @@ void SaveRiskState()
 //+------------------------------------------------------------------+
 bool LoadRiskState()
 {
-   string filename = "risk_state_" + _Symbol + ".dat";
+   string filename = GetRiskStateFilename();
    if(!FileIsExist(filename, FILE_COMMON)) return false;
 
    int fh = FileOpen(filename, FILE_READ | FILE_ANSI | FILE_COMMON);
