@@ -1969,6 +1969,7 @@ void OnTick()
       finalDecision = GenerateRangeBoundaryEntries(g_ind, g_profile,
                                                    EntryADXMin, EntryADXTrend, EntryADXRange,
                                                    EntryZoneTolATR, EntryStopATR, RewardRisk,
+                                                   entryRegime,
                                                    TrendSlopeLookback);
 
       if(GetD1Bias() == D1_BIAS_BULL && finalDecision.valid && !finalDecision.isBuy)

@@ -3558,61 +3558,65 @@ int SDFindNearestOppositeZone(bool wantDemand, double price, double atrVal)
    double bestScore = -DBL_MAX;
    int bestIdx = -1;
 
+   if(price <= 0.0 || atrVal <= 0.0)
+      return -1;
+
    for(int i = 0; i < g_zoneReg.count; i++)
    {
-      // Allow historical-but-sound zones to be promoted as opposite-side
-      // fallback. Many supply zones get flipped to historical=true/active=false
-      // during dedup/photo-filter but are still structurally valid.
-      if(!g_zoneReg.zones[i].active)
-      {
-         bool soundHistorical =
-            (!g_zoneReg.zones[i].broken &&
-             !g_zoneReg.zones[i].failedRetest &&
-             (g_zoneReg.zones[i].valid ||
-              g_zoneReg.zones[i].majorQualified ||
-              g_zoneReg.zones[i].qualityScore >= 4.75));
+      ZoneInfo z = g_zoneReg.zones[i];
 
-         if(!soundHistorical)
-            continue;
-      }
-
-      if(g_zoneReg.zones[i].broken && !SDIsPendingFlipRetestZone(g_zoneReg.zones[i]))
+      if(!z.active || !z.valid)
          continue;
 
-      if(g_zoneReg.zones[i].failedRetest)
+      if(z.historical ||
+         z.broken ||
+         z.failedRetest ||
+         z.isTPTargetOnly)
          continue;
 
-      bool isCorrectSide = wantDemand ? (g_zoneReg.zones[i].upperBound <= price)
-                                      : (g_zoneReg.zones[i].lowerBound >= price);
-
-      if(!isCorrectSide)
+      if(SDIsPendingFlipRetestZone(z))
          continue;
 
-      double distATR = SDDistanceToZoneATR(g_zoneReg.zones[i], price, atrVal);
+      bool correctSide =
+         wantDemand
+         ? SDZoneCanActAsDemandSide(z, price, atrVal)
+         : SDZoneCanActAsSupplySide(z, price, atrVal);
 
-      if(atrVal > 0.0 && distATR > SD_ACTIVE_PAIR_FALLBACK_MAX_ATR)
+      if(!correctSide)
          continue;
 
-      if(g_zoneReg.zones[i].ageInBars > 1200 && !g_zoneReg.zones[i].majorQualified)
+      if(!SDZonePassesExecutionQuality(z, atrVal, true))
          continue;
 
-      if(SDZoneTooWideForActiveDisplay(g_zoneReg.zones[i], atrVal))
+      if(SDZoneTooWideForActiveDisplay(z, atrVal))
          continue;
 
-      bool qualityOk =
-         g_zoneReg.zones[i].valid ||
-         g_zoneReg.zones[i].majorQualified ||
-         g_zoneReg.zones[i].qualityScore >= 4.75 ||
-         g_zoneReg.zones[i].departureATR >= InpSDMinDepartureATR;
+      double distATR = SDDistanceToZoneATR(z, price, atrVal);
 
-      if(!qualityOk)
+      if(distATR > SD_ACTIVE_PAIR_FALLBACK_MAX_ATR)
          continue;
 
-      double score = SDVisibleSideScore(g_zoneReg.zones[i], wantDemand, price, atrVal);
+      if(z.ageInBars > 1200 && !z.majorQualified)
+         continue;
 
-      // For the opposite visible boundary, distance matters, but do not hide it
-      // only because price is not currently touching it.
+      double score = SDVisibleSideScore(z, wantDemand, price, atrVal);
+
       score -= distATR * 0.65;
+
+      if(wantDemand)
+      {
+         if(z.structuralTag == "HL")
+            score += 0.75;
+         else if(z.structuralTag == "LL")
+            score += 0.50;
+      }
+      else
+      {
+         if(z.structuralTag == "LH")
+            score += 0.75;
+         else if(z.structuralTag == "HH")
+            score += 0.50;
+      }
 
       if(score > bestScore)
       {
@@ -4184,118 +4188,146 @@ bool SDZoneIsUsableForActivePair(ZoneInfo &z)
 
 void SDSelectBackups(double price, double atrVal)
 {
-   int maxBackups = MathMax(0, InpSDMaxBackupZonesPerSide);
-   if(maxBackups <= 0 || !InpSDKeepBackupZonesInMemory)
-      return;
+   int maxBackups =
+      MathMax(0, InpSDMaxBackupZonesPerSide);
 
-   // Clear previous backup flags from non-primary zones and reset backup ID arrays
    for(int i = 0; i < g_zoneReg.count; i++)
-   {
-      if(g_zoneReg.zones[i].isPrimary)
-         continue;
-      if(g_zoneReg.zones[i].id == g_activeDemandZoneId ||
-         g_zoneReg.zones[i].id == g_activeSupplyZoneId)
-         continue;
-
       g_zoneReg.zones[i].isBackup = false;
-      if(!g_zoneReg.zones[i].isTPTargetOnly)
-         g_zoneReg.zones[i].isExecutionEligible = false;
-   }
 
    ArrayResize(g_backupDemandZoneIds, 0);
    ArrayResize(g_backupSupplyZoneIds, 0);
 
-   // Select qualified hidden backups for Demand and Supply independently
+   if(maxBackups <= 0 ||
+      price <= 0.0 ||
+      atrVal <= 0.0)
+      return;
+
    for(int side = 0; side < 2; side++)
    {
       bool wantDemand = (side == 0);
 
-      for(int b = 0; b < maxBackups; b++)
+      for(int slot = 0; slot < maxBackups; slot++)
       {
          double bestScore = -DBL_MAX;
          int bestIndex = -1;
 
          for(int i = 0; i < g_zoneReg.count; i++)
          {
-            if(g_zoneReg.zones[i].id <= 0)
+            ZoneInfo z = g_zoneReg.zones[i];
+
+            if(z.id == g_activeDemandZoneId ||
+               z.id == g_activeSupplyZoneId)
                continue;
 
-            if(g_zoneReg.zones[i].id == g_activeDemandZoneId ||
-               g_zoneReg.zones[i].id == g_activeSupplyZoneId)
+            if(z.isBackup)
                continue;
 
-            if(g_zoneReg.zones[i].isPrimary || g_zoneReg.zones[i].isBackup)
+            if(!z.active ||
+               !z.valid ||
+               z.historical ||
+               z.broken ||
+               z.failedRetest ||
+               z.isTPTargetOnly)
                continue;
 
-            if(g_zoneReg.zones[i].historical ||
-               g_zoneReg.zones[i].broken ||
-               g_zoneReg.zones[i].failedRetest)
+            if(SDIsPendingFlipRetestZone(z))
                continue;
 
-            if(g_zoneReg.zones[i].isTPTargetOnly)
+            if(!SDZonePassesExecutionQuality(
+                  z,
+                  atrVal,
+                  true))
                continue;
 
-            if(!g_zoneReg.zones[i].active || !g_zoneReg.zones[i].valid)
+            bool correctSide =
+               wantDemand
+               ? SDZoneCanActAsDemandSide(
+                    z,
+                    price,
+                    atrVal)
+               : SDZoneCanActAsSupplySide(
+                    z,
+                    price,
+                    atrVal);
+
+            if(!correctSide)
                continue;
 
-            bool sideOk = wantDemand
-                          ? SDZoneCanActAsDemandSide(g_zoneReg.zones[i], price, atrVal)
-                          : SDZoneCanActAsSupplySide(g_zoneReg.zones[i], price, atrVal);
+            double distATR =
+               SDDistanceToZoneATR(
+                  z,
+                  price,
+                  atrVal);
 
-            if(!sideOk)
+            if(distATR > 4.50 &&
+               !z.majorQualified)
                continue;
 
-            if(!SDZonePassesExecutionQuality(g_zoneReg.zones[i], atrVal, true))
-               continue;
+            double score =
+               SDActiveZoneScore(
+                  z,
+                  price,
+                  atrVal);
 
-            double rankScore = SDActiveZoneScore(g_zoneReg.zones[i], price, atrVal);
+            score += z.qualityScore * 0.35;
+            score -= distATR * 0.25;
 
-            string tag = g_zoneReg.zones[i].structuralTag;
             if(wantDemand)
             {
-               if(tag == "HL" || tag == "LL")
-                  rankScore += 2.0;
+               if(z.structuralTag == "HL")
+                  score += 0.75;
+               else if(z.structuralTag == "LL")
+                  score += 0.50;
             }
             else
             {
-               if(tag == "LH" || tag == "HH")
-                  rankScore += 2.0;
+               if(z.structuralTag == "LH")
+                  score += 0.75;
+               else if(z.structuralTag == "HH")
+                  score += 0.50;
             }
 
-            double distATR = SDDistanceToZoneATR(g_zoneReg.zones[i], price, atrVal);
-            rankScore += MathMax(0.0, 1.5 - distATR);
-
-            if(rankScore > bestScore)
+            if(score > bestScore)
             {
-               bestScore = rankScore;
+               bestScore = score;
                bestIndex = i;
             }
          }
 
-         if(bestIndex < 0)
-            break;
+         if(bestIndex >= 0)
+         {
+            int idx = bestIndex;
 
-         g_zoneReg.zones[bestIndex].isBackup = true;
-         g_zoneReg.zones[bestIndex].isPrimary = false;
-         g_zoneReg.zones[bestIndex].isExecutionEligible = true;
+            g_zoneReg.zones[idx].isBackup = true;
+            g_zoneReg.zones[idx].isPrimary = false;
+            g_zoneReg.zones[idx].isExecutionEligible = true;
 
-         SDAddBackupId(wantDemand, g_zoneReg.zones[bestIndex].id);
+            SDAddBackupId(
+               wantDemand,
+               g_zoneReg.zones[idx].id);
 
-         double distATR = SDDistanceToZoneATR(g_zoneReg.zones[bestIndex], price, atrVal);
-
-         Print("[SD_BACKUP_SELECTED]",
-               " side=", wantDemand ? "DEMAND" : "SUPPLY",
-               " id=", g_zoneReg.zones[bestIndex].id,
-               " tag=", g_zoneReg.zones[bestIndex].structuralTag,
-               " qualityScore=", DoubleToString(g_zoneReg.zones[bestIndex].qualityScore, 2),
-               " rankScore=", DoubleToString(bestScore, 2),
-               " distATR=", DoubleToString(distATR, 2));
-
-         Print("[SD_BACKUP_EXEC_ELIGIBLE]",
-               " id=", g_zoneReg.zones[bestIndex].id,
-               " side=", wantDemand ? "DEMAND" : "SUPPLY",
-               " tag=", g_zoneReg.zones[bestIndex].structuralTag,
-               " qualityScore=", DoubleToString(g_zoneReg.zones[bestIndex].qualityScore, 2));
+            Print(
+               "[SD_BACKUP_SELECTED]",
+               " side=",
+               wantDemand ? "Demand" : "Supply",
+               " id=", g_zoneReg.zones[idx].id,
+               " tag=", g_zoneReg.zones[idx].structuralTag,
+               " quality=",
+               DoubleToString(
+                  g_zoneReg.zones[idx].qualityScore,
+                  2),
+               " score=",
+               DoubleToString(
+                  bestScore,
+                  2),
+               " distATR=",
+               DoubleToString(
+                  SDDistanceToZoneATR(
+                     g_zoneReg.zones[idx],
+                     price,
+                     atrVal),
+                  2));
+         }
       }
    }
 }
@@ -4524,24 +4556,11 @@ bool SDIsActiveTradingZone(ZoneInfo &z)
    bool isActiveSupply = (z.id > 0 && z.id == g_activeSupplyZoneId);
 
    // Active IDs are final authority.
-   // Do not use old static type here because zones can dynamically act as Demand/Supply.
    if(isActiveDemand || isActiveSupply)
    {
-      if(z.broken)
+      if(z.broken || z.failedRetest)
          return false;
 
-      if(!z.valid || !z.active)
-         return false;
-
-      if(!z.isExecutionEligible)
-         return false;
-
-      return true;
-   }
-
-   // Backup zones can trade if execution-eligible and quality passes
-   if(InpSDKeepBackupZonesInMemory && z.isBackup)
-   {
       if(!z.active || !z.valid)
          return false;
 
@@ -4551,21 +4570,33 @@ bool SDIsActiveTradingZone(ZoneInfo &z)
       if(!SDZonePassesExecutionQuality(z, 0.0, true))
          return false;
 
+      return true;
+   }
+
+   // Backup zones can trade if execution-eligible and quality passes
+   if(InpSDKeepBackupZonesInMemory &&
+      z.isBackup &&
+      z.active &&
+      z.valid &&
+      z.isExecutionEligible &&
+      !z.broken &&
+      !z.failedRetest &&
+      SDZonePassesExecutionQuality(z, 0.0, true))
+   {
       static datetime s_lastBackupTradeAllowedLog = 0;
       if(TimeCurrent() - s_lastBackupTradeAllowedLog >= 5)
       {
          s_lastBackupTradeAllowedLog = TimeCurrent();
-         string side = IsBullishZone(z.type) ? "DEMAND" : "SUPPLY";
-         Print("[SD_BACKUP_TRADE_ALLOWED] id=", z.id,
-               " side=", side,
+         Print("[SD_BACKUP_TRADE_ALLOWED]",
+               " id=", z.id,
                " tag=", z.structuralTag,
-               " quality=", DoubleToString(z.qualityScore, 2));
+               " quality=",
+               DoubleToString(z.qualityScore, 2));
       }
 
       return true;
    }
 
-   // Non-active zones cannot be used for entries.
    return false;
 }
 
@@ -6624,47 +6655,77 @@ void RefreshZones(const IndicatorState &ind, const SymbolProfile &prof, int merg
       // STEP 4: Separate visual zones from execution zones.
       // Visible active Demand/Supply are primary; execution eligibility depends on quality.
       // Qualified hidden backups are execution-eligible but not primary.
-      int backupDemandCount = 0;
-      int backupSupplyCount = 0;
+      int backupDemandCount = ArraySize(g_backupDemandZoneIds);
+      int backupSupplyCount = ArraySize(g_backupSupplyZoneIds);
       for(int i = 0; i < g_zoneReg.count; i++)
       {
-         bool isActiveDemand = (g_zoneReg.zones[i].id == g_activeDemandZoneId);
-         bool isActiveSupply = (g_zoneReg.zones[i].id == g_activeSupplyZoneId);
+         int idx = i;
+
+         bool isActiveDemand =
+            (g_zoneReg.zones[idx].id > 0 &&
+             g_zoneReg.zones[idx].id == g_activeDemandZoneId);
+
+         bool isActiveSupply =
+            (g_zoneReg.zones[idx].id > 0 &&
+             g_zoneReg.zones[idx].id == g_activeSupplyZoneId);
+
+         bool backupCanExecute =
+            InpSDKeepBackupZonesInMemory &&
+            g_zoneReg.zones[idx].isBackup &&
+            g_zoneReg.zones[idx].active &&
+            g_zoneReg.zones[idx].valid &&
+            !g_zoneReg.zones[idx].historical &&
+            !g_zoneReg.zones[idx].broken &&
+            !g_zoneReg.zones[idx].failedRetest &&
+            SDZonePassesExecutionQuality(
+               g_zoneReg.zones[idx],
+               atrVal,
+               true);
 
          if(isActiveDemand || isActiveSupply)
          {
-            g_zoneReg.zones[i].isPrimary = true;
-            g_zoneReg.zones[i].isBackup  = false;
-            g_zoneReg.zones[i].isExecutionEligible =
-               SDZonePassesExecutionQuality(g_zoneReg.zones[i], atrVal, true);
+            g_zoneReg.zones[idx].isPrimary = true;
+
+            g_zoneReg.zones[idx].isExecutionEligible =
+               g_zoneReg.zones[idx].active &&
+               g_zoneReg.zones[idx].valid &&
+               !g_zoneReg.zones[idx].broken &&
+               !g_zoneReg.zones[idx].failedRetest &&
+               SDZonePassesExecutionQuality(
+                  g_zoneReg.zones[idx],
+                  atrVal,
+                  true);
+         }
+         else if(backupCanExecute)
+         {
+            g_zoneReg.zones[idx].isPrimary = false;
+            g_zoneReg.zones[idx].isExecutionEligible = true;
+
+            Print(
+               "[SD_BACKUP_EXEC_ELIGIBLE]",
+               " id=", g_zoneReg.zones[idx].id,
+               " tag=", g_zoneReg.zones[idx].structuralTag,
+               " quality=",
+               DoubleToString(
+                  g_zoneReg.zones[idx].qualityScore,
+                  2));
          }
          else
          {
-            g_zoneReg.zones[i].isPrimary = false;
+            g_zoneReg.zones[idx].isPrimary = false;
 
-            if(g_zoneReg.zones[i].isBackup
-               && g_zoneReg.zones[i].active
-               && g_zoneReg.zones[i].valid
-               && SDZonePassesExecutionQuality(g_zoneReg.zones[i], atrVal, true))
-            {
-               g_zoneReg.zones[i].isExecutionEligible = true;
-
-               if(IsBullishZone(g_zoneReg.zones[i].type))
-                  backupDemandCount++;
-               else if(IsBearishZone(g_zoneReg.zones[i].type))
-                  backupSupplyCount++;
-            }
-            else if(!g_zoneReg.zones[i].isTPTargetOnly)
-            {
-               g_zoneReg.zones[i].isExecutionEligible = false;
-            }
+            if(!g_zoneReg.zones[idx].isTPTargetOnly)
+               g_zoneReg.zones[idx].isExecutionEligible = false;
          }
       }
 
-      Print("[SD_EXEC_ELIGIBILITY] DemandId=", g_activeDemandZoneId,
-            " SupplyId=", g_activeSupplyZoneId,
-            " backupDemandCount=", backupDemandCount,
-            " backupSupplyCount=", backupSupplyCount);
+      Print(
+         "[SD_EXEC_ELIGIBILITY]",
+         " DemandId=", g_activeDemandZoneId,
+         " SupplyId=", g_activeSupplyZoneId,
+         " backupDemandCount=", backupDemandCount,
+         " backupSupplyCount=", backupSupplyCount,
+         " policy=one_visual_pair_with_hidden_execution_backups");
    }
 
    g_zoneReg.initialized = true;

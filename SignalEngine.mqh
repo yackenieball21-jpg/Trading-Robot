@@ -5389,15 +5389,16 @@ EntryDecision ShouldOpenBuyRange(const IndicatorState &ind,
                                   double adxMin,      double adxTrend,
                                   double adxRange,    double zoneTolMult,
                                   double stopMult,    double rr,
+                                  MARKET_REGIME confirmedRegime,
                                   int    slopeLB = 3)
 {
    EntryDecision out = MakeEmptyDecision();
    out.isBuy = true;
    out.mode  = TRADE_MODE_RANGE;
 
-   // PRIMARY: Use market structure as regime source
+   // PRIMARY: Use regime passed from main EA
    // FALLBACK: Only use classifier if structure is invalid
-   MARKET_REGIME regime = GetRegimeFromMarketStructure();
+   MARKET_REGIME regime = confirmedRegime;
    if(regime == REGIME_NONE)
    {
       regime = ClassifyMarketRegime(ind, slopeLB, 14, adxTrend, adxRange, false);
@@ -5994,15 +5995,16 @@ EntryDecision ShouldOpenSellRange(const IndicatorState &ind,
                                    double adxMin,      double adxTrend,
                                    double adxRange,    double zoneTolMult,
                                    double stopMult,    double rr,
+                                   MARKET_REGIME confirmedRegime,
                                    int    slopeLB = 3)
 {
    EntryDecision out = MakeEmptyDecision();
    out.isBuy = false;
    out.mode  = TRADE_MODE_RANGE;
 
-   // PRIMARY: Use market structure as regime source
+   // PRIMARY: Use regime passed from main EA
    // FALLBACK: Only use classifier if structure is invalid
-   MARKET_REGIME regime = GetRegimeFromMarketStructure();
+   MARKET_REGIME regime = confirmedRegime;
    if(regime == REGIME_NONE)
    {
       regime = ClassifyMarketRegime(ind, slopeLB, 14, adxTrend, adxRange, false);
@@ -6388,15 +6390,16 @@ EntryDecision GenerateRangeBoundaryEntries(const IndicatorState &ind,
                                           const SymbolProfile &prof,
                                           double adxMin, double adxTrend, double adxRange,
                                           double zoneTolMult, double stopMult, double rr,
+                                          MARKET_REGIME confirmedRegime,
                                           int slopeLB = 3)
 {
    EntryDecision out = MakeEmptyDecision();
 
    // Try both sides
    EntryDecision buyRange  = ShouldOpenBuyRange(ind, prof, adxMin, adxTrend, adxRange,
-                                                 zoneTolMult, stopMult, rr, slopeLB);
+                                                 zoneTolMult, stopMult, rr, confirmedRegime, slopeLB);
    EntryDecision sellRange = ShouldOpenSellRange(ind, prof, adxMin, adxTrend, adxRange,
-                                                  zoneTolMult, stopMult, rr, slopeLB);
+                                                  zoneTolMult, stopMult, rr, confirmedRegime, slopeLB);
 
    Print("[RANGE_BOUNDARY_WRAPPER] buyValid=", buyRange.valid,
          " buyReason=", buyRange.reason,
@@ -6430,10 +6433,28 @@ EntryDecision GenerateRangeBoundaryEntries(const IndicatorState &ind,
          for(int i = 0; i < g_zoneReg.count; i++)
          {
             ZoneInfo z = g_zoneReg.zones[i];
-            // Patch 13: include backup zones in fallback scan even if not visually active
-            bool zoneAlive = z.active || (InpSDKeepBackupZonesInMemory && z.isBackup);
-            if(!zoneAlive || z.historical || z.broken) continue;
-            if(!z.isExecutionEligible) continue;  // only execution candidates
+
+            bool zoneAlive =
+               z.active ||
+               (InpSDKeepBackupZonesInMemory && z.isBackup);
+
+            if(!zoneAlive ||
+               z.historical ||
+               z.broken ||
+               z.failedRetest)
+               continue;
+
+            bool canUseForRange =
+               z.isExecutionEligible ||
+               (InpSDKeepBackupZonesInMemory &&
+                z.isBackup &&
+                SDZonePassesExecutionQuality(
+                   g_zoneReg.zones[i],
+                   atr,
+                   true));
+
+            if(!canUseForRange)
+               continue;
 
             bool isDemandType = (z.type == ZONE_DEMAND || z.type == ZONE_DEMAND_MAJOR ||
                                  z.type == ZONE_DEMAND_MINOR || z.type == ZONE_SUPPORT_MAJOR ||
@@ -6883,10 +6904,24 @@ EntryDecision GenerateTrendContinuationDecision(const IndicatorState &ind,
    }
 
    if(isBull && !strictBullEMA && bullStructureOverride)
-      Print("[TREND_EMA_OVERRIDE] side=BUY");
+      Print("[TREND_EMA_OVERRIDE]",
+            " side=BUY",
+            " close=", DoubleToString(close1, _Digits),
+            " ema50=", DoubleToString(ema50, _Digits),
+            " ema200=", DoubleToString(ema200, _Digits),
+            " HH=", g_structure.consecutiveHH,
+            " HL=", g_structure.consecutiveHL,
+            " adx=", DoubleToString(adxNow, 1));
 
    if(!isBull && !strictBearEMA && bearStructureOverride)
-      Print("[TREND_EMA_OVERRIDE] side=SELL");
+      Print("[TREND_EMA_OVERRIDE]",
+            " side=SELL",
+            " close=", DoubleToString(close1, _Digits),
+            " ema50=", DoubleToString(ema50, _Digits),
+            " ema200=", DoubleToString(ema200, _Digits),
+            " LH=", g_structure.consecutiveLH,
+            " LL=", g_structure.consecutiveLL,
+            " adx=", DoubleToString(adxNow, 1));
 
    if(adxNow < MathMax(EntryADXMin, 12.0))
    {
